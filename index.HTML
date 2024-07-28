@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elite Lap Timer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+            padding: 0;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: #fff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1,
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 1rem;
+        }
+
+        input,
+        button,
+        select {
+            font-family: 'Roboto', sans-serif;
+            font-size: 1rem;
+            padding: 0.5rem;
+            margin: 0.5rem 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #3498db;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        #lapTimes,
+        #comparison {
+            margin-top: 2rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 0.5rem;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        #chart {
+            margin-top: 2rem;
+            max-width: 100%;
+            height: 300px;
+        }
+
+        #comparisonResults {
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: #f0f8ff;
+            border-radius: 4px;
+            border-left: 4px solid #3498db;
+        }
+
+        .winner {
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .loser {
+            color: #e74c3c;
+        }
+
+        #userSelects {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        #userSelects select {
+            flex-grow: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Elite Lap Timer</h1>
+
+        <div>
+            <input type="text" id="userName" placeholder="Enter your name">
+            <input type="number" id="lapTime" placeholder="Enter lap time (seconds)">
+            <button onclick="addLapTime()">Add Lap Time</button>
+        </div>
+
+        <div id="lapTimes">
+            <h2>Lap Times</h2>
+            <table id="lapTimesTable">
+                <tr>
+                    <th>User</th>
+                    <th>Lap</th>
+                    <th>Time</th>
+                    <th>Improvement</th>
+                </tr>
+            </table>
+        </div>
+
+        <div id="comparison">
+            <h2>User Comparison</h2>
+            <input type="number" id="userCount" min="2" value="2" placeholder="Number of users to compare">
+            <button onclick="updateUserSelects()">Update</button>
+            <div id="userSelects"></div>
+            <button onclick="compareUsers()">Compare</button>
+            <div id="comparisonResults"></div>
+        </div>
+
+        <canvas id="chart"></canvas>
+    </div>
+
+    <script>
+        let lapTimes = {};
+        let chart;
+
+        function addLapTime() {
+            const userName = document.getElementById('userName').value;
+            const lapTime = parseFloat(document.getElementById('lapTime').value);
+
+            if (!userName || isNaN(lapTime)) {
+                alert('Please enter a valid name and lap time.');
+                return;
+            }
+
+            if (!lapTimes[userName]) {
+                lapTimes[userName] = [];
+            }
+
+            const improvement = lapTimes[userName].length > 0
+                ? lapTimes[userName][lapTimes[userName].length - 1] - lapTime
+                : 0;
+
+            lapTimes[userName].push(lapTime);
+
+            updateLapTimesTable();
+            updateUserSelects();
+            updateChart();
+        }
+
+        function updateLapTimesTable() {
+            const table = document.getElementById('lapTimesTable');
+            table.innerHTML = '<tr><th>User</th><th>Lap</th><th>Time</th><th>Improvement</th></tr>';
+
+            for (const [user, times] of Object.entries(lapTimes)) {
+                times.forEach((time, index) => {
+                    const row = table.insertRow(-1);
+                    row.insertCell(0).textContent = user;
+                    row.insertCell(1).textContent = index + 1;
+                    row.insertCell(2).textContent = time.toFixed(2) + 's';
+
+                    const improvement = index > 0 ? times[index - 1] - time : 0;
+                    const improvementCell = row.insertCell(3);
+                    improvementCell.textContent = improvement.toFixed(2) + 's';
+                    improvementCell.style.color = improvement > 0 ? 'green' : 'red';
+                });
+            }
+        }
+
+        function updateUserSelects() {
+            const userCount = parseInt(document.getElementById('userCount').value);
+            const userSelects = document.getElementById('userSelects');
+            userSelects.innerHTML = '';
+            const users = Object.keys(lapTimes);
+
+            for (let i = 0; i < userCount; i++) {
+                const select = document.createElement('select');
+                select.id = `user${i + 1}`;
+                users.forEach(user => {
+                    const option = document.createElement('option');
+                    option.value = user;
+                    option.textContent = user;
+                    select.appendChild(option);
+                });
+                userSelects.appendChild(select);
+            }
+        }
+
+        function compareUsers() {
+            const userSelects = document.querySelectorAll('#userSelects select');
+            const users = Array.from(userSelects).map(select => select.value);
+            const resultsDiv = document.getElementById('comparisonResults');
+
+            if (new Set(users).size !== users.length) {
+                alert('Please select different users for comparison.');
+                return;
+            }
+
+            let results = '<h3>Comparison Results</h3>';
+            let userStats = [];
+
+            users.forEach(user => {
+                const times = lapTimes[user];
+                const avg = times.reduce((a, b) => a + b, 0) / times.length;
+                const best = Math.min(...times);
+                const improvement = times[0] - times[times.length - 1];
+                const consistency = Math.sqrt(times.reduce((acc, val) => acc + Math.pow(val - avg, 2), 0) / times.length);
+
+                userStats.push({ user, avg, best, improvement, consistency });
+            });
+
+            userStats.sort((a, b) => a.avg - b.avg);
+            const winner = userStats[0];
+
+            results += `<p><span class="winner">${winner.user}</span> is performing best overall!</p>`;
+            results += '<table><tr><th>User</th><th>Avg Time</th><th>Best Time</th><th>Improvement</th><th>Consistency</th></tr>';
+
+            userStats.forEach(stat => {
+                results += `<tr>
+                    <td>${stat.user}</td>
+                    <td>${stat.avg.toFixed(2)}s</td>
+                    <td>${stat.best.toFixed(2)}s</td>
+                    <td>${stat.improvement.toFixed(2)}s</td>
+                    <td>${stat.consistency.toFixed(2)}</td>
+                </tr>`;
+            });
+
+            results += '</table>';
+
+            results += '<p>Interesting Details:</p><ul>';
+            results += `<li>${winner.user} has the best average time of ${winner.avg.toFixed(2)}s.</li>`;
+            results += `<li>${userStats.find(stat => stat.best === Math.min(...userStats.map(s => s.best))).user} has the fastest single lap at ${Math.min(...userStats.map(s => s.best)).toFixed(2)}s.</li>`;
+            results += `<li>${userStats.find(stat => stat.improvement === Math.max(...userStats.map(s => s.improvement))).user} showed the most improvement from first to last lap.</li>`;
+            results += `<li>${userStats.find(stat => stat.consistency === Math.min(...userStats.map(s => s.consistency))).user} was the most consistent across all laps.</li>`;
+            results += '</ul>';
+
+            resultsDiv.innerHTML = results;
+            updateChart(users);
+        }
+
+        function updateChart(users) {
+            if (chart) {
+                chart.destroy();
+            }
+
+            const ctx = document.getElementById('chart').getContext('2d');
+            const datasets = users.map(user => ({
+                label: user,
+                data: lapTimes[user],
+                borderColor: `rgb(${Math.random() * 255},${Math.random() * 255},${Math.random() * 255})`,
+                tension: 0.1
+            }));
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: datasets[0].data.map((_, index) => `Lap ${index + 1}`),
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Lap Time (seconds)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Lap Number'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize user selects
+        updateUserSelects();
+    </script>
+</body>
+
+</html>
